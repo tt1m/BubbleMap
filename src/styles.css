@@ -1,0 +1,290 @@
+:root {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    color: #111827;
+    background: #f3f4f6;
+}
+
+body {
+    margin: 0;
+}
+
+button,
+input,
+select {
+    font: inherit;
+}
+
+button,
+.image-upload-button,
+.import-blueprint-button {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #111827;
+    border-radius: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+    text-align: center;
+}
+
+button:hover,
+.image-upload-button:hover,
+.import-blueprint-button:hover {
+    background: #f9fafb;
+}
+
+input,
+select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 4px 6px;
+    background: #ffffff;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.app {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 340px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    min-height: 0;
+}
+
+.sidebar-top,
+.sidebar-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+}
+
+.sidebar-top {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-bottom {
+    border-top: 1px solid #e5e7eb;
+}
+
+.template-name-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #4b5563;
+}
+
+.config-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid #e5e7eb;
+    max-height: 42vh;
+    overflow-y: auto;
+}
+
+.config-panel h3,
+.layers-panel h3 {
+    margin: 6px 0 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.config-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.config-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: #4b5563;
+}
+
+.checkbox-label {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px !important;
+}
+
+.checkbox-label input {
+    width: auto;
+}
+
+.config-empty {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.layers-panel {
+    flex: 1;
+    min-height: 160px;
+    padding: 10px;
+    overflow-y: auto;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.selectable-list,
+.selectable-list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.selectable-list ul {
+    margin-left: 12px;
+    margin-top: 2px;
+}
+
+.selectable-list li {
+    margin: 1px 0;
+}
+
+.list-item {
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    padding: 4px 7px;
+    border-radius: 5px;
+}
+
+.list-item:hover {
+    background: #f3f4f6;
+}
+
+.list-item.selected {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.canvas {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    background: #e5e7eb;
+}
+
+.loaded-image {
+    pointer-events: none;
+}
+
+.entry-grid {
+    cursor: move;
+}
+
+.bubble-item {
+    cursor: grab;
+}
+
+.bubble-item:active {
+    cursor: grabbing;
+}
+
+.bubble-size-handle,
+.entry-grid-size-handle,
+.anchor-size-handle {
+    cursor: nwse-resize;
+}
+
+.anchor-rect {
+    cursor: move;
+}
+
+.anchor-item {
+    pointer-events: all;
+}
+
+.hidden {
+    display: none;
+}
+
+.hidden-handle {
+    opacity: 0;
+}
+
+body.is-resizing,
+body.is-resizing * {
+    cursor: none !important;
+}
+
+.canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    background: #e5e7eb;
+    cursor: grab;
+}
+
+.canvas-wrap.is-panning {
+    cursor: grabbing;
+}
+
+.canvas-wrap.is-panning * {
+    cursor: grabbing !important;
+}
+
+.canvas-inner {
+    min-width: 100%;
+    min-height: 100%;
+    padding: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.canvas-scale {
+    width: 1240px;
+    height: 1754px;
+    transform-origin: top left;
+}
+
+.canvas {
+    display: block;
+    width: 1240px;
+    height: 1754px;
+    background: white;
+}
+
+.zoom-container {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+}
+
+.field-hitbox {
+    cursor: move;
+    vector-effect: non-scaling-stroke;
+}
+
+.entry-grid-box {
+    cursor: move;
+}
+
+.bubble-shape {
+    vector-effect: non-scaling-stroke;
+}
+
+.entry-grid-box,
+.bubble-shape,
+.anchor-rect {
+    vector-effect: non-scaling-stroke;
+}

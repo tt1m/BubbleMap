@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/modern-normalize@3.0.1/modern-normalize.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+
+    <title>Template Editor</title>
+</head>
+
+<body>
+    <main class="app">
+        <aside class="sidebar">
+
+            <div class="sidebar-top">
+                <label class="image-upload-button" for="image_upload">
+                    Load Image
+                </label>
+
+                <input id="image_upload" type="file" accept="image/*">
+
+                <label class="template-name-label">
+                    Template name
+                    <input id="template_name_input" type="text" value="" placeholder="Untitled" spellcheck="false">
+                </label>
+
+                <label class="import-blueprint-button" for="import_blueprint_input">
+                    Import Blueprint
+                </label>
+                <input id="import_blueprint_input" type="file" accept="application/json">
+
+                <button id="export_blueprint_button" type="button">Save Editable Blueprint</button>
+
+                <button id="export_template_button" type="button">Export OMR Template</button>
+                <button id="add_anchor_button" type="button">Add Anchor</button>
+
+                <div class="zoom-container">
+                    <button id="zoom_out_button" type="button">Zoom -</button>
+                    <button id="zoom_reset_button" type="button">100%</button>
+                    <button id="zoom_in_button" type="button">Zoom +</button>
+                </div>
+            </div>
+
+            <section class="config-panel">
+                <h3>Field Config</h3>
+
+                <div id="field_config_empty" class="config-empty">
+                    Select a field or entry
+                </div>
+
+                <div id="field_config_form" class="config-form hidden">
+                    <label>
+                        Field name
+                        <input id="field_name_input" type="text">
+                    </label>
+
+                    <label>
+                        Field type
+                        <select id="field_type_input">
+                            <option value="answers">Answers</option>
+                            <option value="identifier">Identifier</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        Bubble shape
+                        <select id="bubble_shape_input">
+                            <option value="rect">Rectangle</option>
+                            <option value="ellipse">Ellipse</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        Bubble width
+                        <input id="bubble_w_input" type="number" min="1" step="0.1">
+                    </label>
+
+                    <label>
+                        Bubble height
+                        <input id="bubble_h_input" type="number" min="1" step="0.1">
+                    </label>
+                </div>
+
+                <h3>Entry Config</h3>
+
+                <div id="entry_config_empty" class="config-empty">
+                    Select an entry
+                </div>
+
+                <div id="entry_config_form" class="config-form hidden">
+                    <label>
+                        Entry name
+                        <input id="entry_name_input" type="text">
+                    </label>
+
+                    <label>
+                        Start X
+                        <input id="entry_start_x_input" type="number" step="0.1">
+                    </label>
+
+                    <label>
+                        Start Y
+                        <input id="entry_start_y_input" type="number" step="0.1">
+                    </label>
+
+                    <label>
+                        Questions
+                        <input id="num_questions_input" type="number" min="1" step="1">
+                    </label>
+
+                    <label>
+                        Options
+                        <input id="options_input" type="text" placeholder="A,B,C,D">
+                    </label>
+
+                    <label>
+                        Row spacing
+                        <input id="row_spacing_input" type="number" min="1" step="0.1">
+                    </label>
+
+                    <label>
+                        Column spacing
+                        <input id="col_spacing_input" type="number" min="1" step="0.1">
+                    </label>
+
+                    <label>
+                        Start question number
+                        <input id="start_question_num_input" type="number" min="1" step="1">
+                    </label>
+
+                    <label class="checkbox-label">
+                        <input id="vertical_options_input" type="checkbox">
+                        Vertical options
+                    </label>
+
+                    <button id="clear_overrides_button" type="button">
+                        Clear Bubble Overrides
+                    </button>
+                </div>
+            </section>
+
+            <section class="layers-panel">
+                <h3>Fields</h3>
+                <ul id="field_list" class="selectable-list"></ul>
+            </section>
+            
+            <div class="selected-config"></div>
+
+            <div class="sidebar-bottom">
+                <button id="new_field">New Field</button>
+                <button id="new_entry">New Entry</button>
+                <button id="duplicate_button">Duplicate</button>
+                <button id="delete_button">Delete</button>
+            </div>
+        </aside>
+
+        <div class="canvas-wrap" id="canvas_wrap">
+            <div class="canvas-inner">
+                <div class="canvas-scale" id="canvas_scale">
+                    <svg class="canvas" id="image_svg">
+                        <image id="loaded_image" class="loaded-image"></image>
+                        <g id="overlay_layer"></g>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <script src="./main.js"></script>
+</body>
+</html>
