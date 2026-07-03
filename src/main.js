@@ -55,17 +55,18 @@ const fieldTypeInput = document.getElementById("field_type_input");
 const bubbleShapeInput = document.getElementById("bubble_shape_input");
 const bubbleWInput = document.getElementById("bubble_w_input");
 const bubbleHInput = document.getElementById("bubble_h_input");
+const fieldNumQuestionsInput = document.getElementById("field_num_questions_input");
+const fieldOptionsInput = document.getElementById("field_options_input");
+const fieldVerticalOptionsInput = document.getElementById("field_vertical_options_input");
+const fieldLockedPosLabel = document.getElementById("field_locked_pos_label");
+const fieldLockedPosInput = document.getElementById("field_locked_pos_input");
 
 const groupNameInput = document.getElementById("group_name_input");
-const groupStartXInput = document.getElementById("group_start_x_input");
-const groupStartYInput = document.getElementById("group_start_y_input");
-const numQuestionsInput = document.getElementById("num_questions_input");
-const optionsInput = document.getElementById("options_input");
+const groupFreePosLabel = document.getElementById("group_free_pos_label");
+const groupFreePosInput = document.getElementById("group_free_pos_input");
 const rowSpacingInput = document.getElementById("row_spacing_input");
 const colSpacingInput = document.getElementById("col_spacing_input");
 const startQuestionNumInput = document.getElementById("start_question_num_input");
-const verticalOptionsInput = document.getElementById("vertical_options_input");
-const clearOverridesButton = document.getElementById("clear_overrides_button");
 
 // Optional defaults panel
 const useSelectedAsDefaultButton = document.getElementById("use_selected_as_default_button");
@@ -73,6 +74,8 @@ const resetDefaultsButton = document.getElementById("reset_defaults_button");
 const defaultsSummary = document.getElementById("defaults_summary");
 
 // Only remember visual/layout defaults globally.
+// Field-level defaults: bubble_shape, bubble_w, bubble_h, num_questions, options, vertical_options
+// Group-level defaults: row_spacing, col_spacing
 const editorDefaults = {
     bubble_shape: "rect",
     bubble_w: 20,
@@ -183,14 +186,14 @@ function updateEditorDefaultsFromField(field) {
     updateEditorDefault("bubble_shape", field.bubble_shape);
     updateEditorDefault("bubble_w", field.bubble_w);
     updateEditorDefault("bubble_h", field.bubble_h);
+    updateEditorDefault("num_questions", field.num_questions);
+    updateEditorDefault("options", structuredClone(field.options));
+    updateEditorDefault("vertical_options", field.vertical_options);
 }
 
 function updateEditorDefaultsFromGroup(group) {
-    updateEditorDefault("num_questions", group.num_questions);
-    updateEditorDefault("options", structuredClone(group.options));
     updateEditorDefault("row_spacing", group.row_spacing);
     updateEditorDefault("col_spacing", group.col_spacing);
-    updateEditorDefault("vertical_options", group.vertical_options);
 }
 
 function resetEditorDefaults() {
@@ -217,14 +220,14 @@ function useSelectedAsDefault() {
         editorDefaults.bubble_shape = field.bubble_shape;
         editorDefaults.bubble_w = field.bubble_w;
         editorDefaults.bubble_h = field.bubble_h;
+        editorDefaults.num_questions = field.num_questions;
+        editorDefaults.options = structuredClone(field.options);
+        editorDefaults.vertical_options = field.vertical_options;
     }
 
     if (group) {
-        editorDefaults.num_questions = group.num_questions;
-        editorDefaults.options = structuredClone(group.options);
         editorDefaults.row_spacing = group.row_spacing;
         editorDefaults.col_spacing = group.col_spacing;
-        editorDefaults.vertical_options = group.vertical_options;
     }
 
     saveEditorDefaults();
@@ -308,27 +311,23 @@ function getSelectedGroup() {
     return getGroupById(selectedGroupId);
 }
 
-function getOverride(group, rowIdx, colIdx) {
-    return group.overrides.find((override) => {
-        return override.row_idx === rowIdx && override.col_idx === colIdx;
-    }) || null;
+// Axis locking: a field is "a grid of grids". Depending on vertical_options,
+// every group in the field shares the same coordinate on one axis (the
+// "locked" axis) so the field can only extend along the other axis (the
+// "free" axis). Groups remain freely positionable along the free axis.
+//
+// vertical_options = true  -> options stack vertically within each group,
+//                              so groups line up side-by-side (free axis: x,
+//                              locked/shared axis: y).
+// vertical_options = false -> options spread horizontally within each group,
+//                              so groups stack one above another (free axis:
+//                              y, locked/shared axis: x).
+function getLockedAxis(field) {
+    return field.vertical_options ? "y" : "x";
 }
 
-function getOrCreateOverride(group, rowIdx, colIdx, defaultX, defaultY) {
-    let override = getOverride(group, rowIdx, colIdx);
-
-    if (!override) {
-        override = {
-            row_idx: rowIdx,
-            col_idx: colIdx,
-            x: defaultX,
-            y: defaultY
-        };
-
-        group.overrides.push(override);
-    }
-
-    return override;
+function getFreeAxis(field) {
+    return field.vertical_options ? "x" : "y";
 }
 
 function clientPointToSvgPoint(clientX, clientY) {
@@ -357,8 +356,8 @@ function getSvgDeltaFromInteractEvent(event) {
     };
 }
 
-function getBubbleDefaultPosition(group, rowIdx, colIdx) {
-    if (group.vertical_options) {
+function getBubbleDefaultPosition(field, group, rowIdx, colIdx) {
+    if (field.vertical_options) {
         return {
             x: group.col_spacing * rowIdx,
             y: group.row_spacing * colIdx
@@ -371,22 +370,8 @@ function getBubbleDefaultPosition(group, rowIdx, colIdx) {
     };
 }
 
-function getBubblePosition(group, rowIdx, colIdx) {
-    const defaultPosition = getBubbleDefaultPosition(group, rowIdx, colIdx);
-    const override = getOverride(group, rowIdx, colIdx);
-
-    if (!override) {
-        return defaultPosition;
-    }
-
-    return {
-        x: override.x,
-        y: override.y
-    };
-}
-
-function getAbsoluteBubblePosition(group, rowIdx, colIdx, field) {
-    const localPosition = getBubblePosition(group, rowIdx, colIdx);
+function getAbsoluteBubblePosition(field, group, rowIdx, colIdx) {
+    const localPosition = getBubbleDefaultPosition(field, group, rowIdx, colIdx);
 
     return {
         x: group.start_x + localPosition.x + field.bubble_w / 2,
@@ -395,8 +380,8 @@ function getAbsoluteBubblePosition(group, rowIdx, colIdx, field) {
 }
 
 function getGridWidth(field, group) {
-    if (group.vertical_options) {
-        const numQuestions = group.num_questions;
+    if (field.vertical_options) {
+        const numQuestions = field.num_questions;
 
         if (numQuestions <= 1) {
             return field.bubble_w;
@@ -405,7 +390,7 @@ function getGridWidth(field, group) {
         return field.bubble_w + group.col_spacing * (numQuestions - 1);
     }
 
-    const numOptions = group.options.length;
+    const numOptions = field.options.length;
 
     if (numOptions <= 1) {
         return field.bubble_w;
@@ -415,8 +400,8 @@ function getGridWidth(field, group) {
 }
 
 function getGridHeight(field, group) {
-    if (group.vertical_options) {
-        const numOptions = group.options.length;
+    if (field.vertical_options) {
+        const numOptions = field.options.length;
 
         if (numOptions <= 1) {
             return field.bubble_h;
@@ -425,7 +410,7 @@ function getGridHeight(field, group) {
         return field.bubble_h + group.row_spacing * (numOptions - 1);
     }
 
-    const numQuestions = group.num_questions;
+    const numQuestions = field.num_questions;
 
     if (numQuestions <= 1) {
         return field.bubble_h;
@@ -541,22 +526,6 @@ function redrawAll() {
     redrawConfig();
 }
 
-function getDefaultGroupPosition(field) {
-    const lastGroup = field.groups[field.groups.length - 1];
-
-    if (!lastGroup) {
-        return {
-            x: 100,
-            y: 100
-        };
-    }
-
-    return {
-        x: lastGroup.start_x + 40,
-        y: lastGroup.start_y + 40
-    };
-}
-
 function getNextStartQuestionNum(field) {
     const lastGroup = field.groups[field.groups.length - 1];
 
@@ -564,7 +533,7 @@ function getNextStartQuestionNum(field) {
         return 1;
     }
 
-    return lastGroup.start_question_num + lastGroup.num_questions;
+    return lastGroup.start_question_num + field.num_questions;
 }
 
 function newField() {
@@ -579,19 +548,18 @@ function newField() {
         bubble_shape: editorDefaults.bubble_shape,
         bubble_w: editorDefaults.bubble_w,
         bubble_h: editorDefaults.bubble_h,
+        num_questions: editorDefaults.num_questions,
+        options: structuredClone(editorDefaults.options),
+        vertical_options: editorDefaults.vertical_options,
         groups: [
             {
                 id: groupId,
                 name: "Group 1",
                 start_x: 100,
                 start_y: 100,
-                num_questions: editorDefaults.num_questions,
-                options: structuredClone(editorDefaults.options),
                 row_spacing: editorDefaults.row_spacing,
                 col_spacing: editorDefaults.col_spacing,
-                vertical_options: editorDefaults.vertical_options,
-                start_question_num: 1,
-                overrides: []
+                start_question_num: 1
             }
         ]
     };
@@ -606,20 +574,32 @@ function newGroup(fieldId) {
 
     const idx = field.groups.length + 1;
     const groupId = `${fieldId}|${crypto.randomUUID()}`;
-    const position = getDefaultGroupPosition(field);
+    const freeAxis = getFreeAxis(field);
+
+    const lastGroup = field.groups[field.groups.length - 1];
+
+    let startX = 100;
+    let startY = 100;
+
+    if (lastGroup) {
+        startX = lastGroup.start_x;
+        startY = lastGroup.start_y;
+
+        if (freeAxis === "x") {
+            startX = lastGroup.start_x + 40;
+        } else {
+            startY = lastGroup.start_y + 40;
+        }
+    }
 
     return {
         id: groupId,
         name: `Group ${idx}`,
-        start_x: position.x,
-        start_y: position.y,
-        num_questions: editorDefaults.num_questions,
-        options: structuredClone(editorDefaults.options),
+        start_x: startX,
+        start_y: startY,
         row_spacing: editorDefaults.row_spacing,
         col_spacing: editorDefaults.col_spacing,
-        vertical_options: editorDefaults.vertical_options,
-        start_question_num: getNextStartQuestionNum(field),
-        overrides: []
+        start_question_num: getNextStartQuestionNum(field)
     };
 }
 
@@ -634,6 +614,9 @@ function newAnchor() {
     };
 }
 
+// Clones a group into a brand new field (used when duplicating an entire
+// field). Both axes shift uniformly, which preserves axis-lock consistency
+// across the cloned group set.
 function cloneGroup(group, newFieldId) {
     return {
         ...structuredClone(group),
@@ -642,6 +625,22 @@ function cloneGroup(group, newFieldId) {
         start_x: group.start_x + 30,
         start_y: group.start_y + 30
     };
+}
+
+// Duplicates a single group within its existing field. Only the free axis
+// may shift - the locked axis must stay in sync with its sibling groups.
+function duplicateGroupInField(group, field) {
+    const freeAxis = getFreeAxis(field);
+
+    const cloned = {
+        ...structuredClone(group),
+        id: `${field.id}|${crypto.randomUUID()}`,
+        name: `${group.name} Copy`
+    };
+
+    cloned[`start_${freeAxis}`] = group[`start_${freeAxis}`] + 30;
+
+    return cloned;
 }
 
 function cloneField(field) {
@@ -663,7 +662,7 @@ function cloneField(field) {
 
 function buildBlueprintJson() {
     return {
-        version: 1,
+        version: 2,
         name: templateNameInput.value || "Untitled",
         image: {
             width: WIDTH,
@@ -692,6 +691,7 @@ function buildTemplateJson() {
         }),
         fields: fields.map((field) => {
             return {
+                id: field.id,
                 name: field.name,
                 type: field.type,
                 bubble: {
@@ -699,20 +699,23 @@ function buildTemplateJson() {
                     width: Math.round(field.bubble_w),
                     height: Math.round(field.bubble_h)
                 },
+                rows: field.num_questions,
+                cols: field.options.length,
+                vertical_options: field.vertical_options,
                 groups: field.groups.map((group) => {
                     const exportedEntries = [];
 
-                    for (let rowIdx = 0; rowIdx < group.num_questions; rowIdx++) {
+                    for (let rowIdx = 0; rowIdx < field.num_questions; rowIdx++) {
                         const question = group.start_question_num + rowIdx;
                         const bubbles = [];
 
-                        for (let colIdx = 0; colIdx < group.options.length; colIdx++) {
-                            const absolutePosition = getAbsoluteBubblePosition(group, rowIdx, colIdx, field);
+                        for (let colIdx = 0; colIdx < field.options.length; colIdx++) {
+                            const absolutePosition = getAbsoluteBubblePosition(field, group, rowIdx, colIdx);
 
                             bubbles.push({
                                 x: Math.round(absolutePosition.x),
                                 y: Math.round(absolutePosition.y),
-                                value: group.options[colIdx]
+                                value: field.options[colIdx]
                             });
                         }
 
@@ -724,9 +727,10 @@ function buildTemplateJson() {
                     }
 
                     return {
-                        entries: exportedEntries   // <- was "groups", should be "entries"
+                        id: group.id,
+                        entries: exportedEntries
                     };
-                })
+                }),
             };
         })
     };
@@ -832,7 +836,7 @@ function createBubbleResizeHandle(field, group) {
 }
 
 function createBubbleGroup(field, group, rowIdx, colIdx) {
-    const position = getBubblePosition(group, rowIdx, colIdx);
+    const position = getBubbleDefaultPosition(field, group, rowIdx, colIdx);
     const gBubble = createSvgElement("g");
 
     gBubble.classList.add("bubble-item");
@@ -919,9 +923,10 @@ function redrawCanvas() {
             gField.appendChild(fieldHitbox);
         }
 
+        const numRows = field.num_questions;
+        const numCols = field.options.length;
+
         field.groups.forEach((group) => {
-            const numCols = group.options.length;
-            const numRows = group.num_questions;
             const gGroup = createSvgElement("g");
 
             gGroup.classList.add("group-grid");
@@ -1010,6 +1015,16 @@ function redrawConfig() {
         bubbleShapeInput.value = field.bubble_shape;
         bubbleWInput.value = formatNumber(field.bubble_w);
         bubbleHInput.value = formatNumber(field.bubble_h);
+        fieldNumQuestionsInput.value = field.num_questions;
+        fieldOptionsInput.value = field.options.join(",");
+        fieldVerticalOptionsInput.checked = field.vertical_options;
+
+        const lockedAxis = getLockedAxis(field);
+
+        fieldLockedPosLabel.textContent = lockedAxis === "x" ? "Start X" : "Start Y";
+        fieldLockedPosInput.value = field.groups.length > 0
+            ? formatNumber(field.groups[0][`start_${lockedAxis}`])
+            : 0;
     }
 
     if (!group) {
@@ -1019,15 +1034,14 @@ function redrawConfig() {
         groupConfigEmpty.classList.add("hidden");
         groupConfigForm.classList.remove("hidden");
 
+        const freeAxis = getFreeAxis(field);
+
         groupNameInput.value = group.name;
-        groupStartXInput.value = formatNumber(group.start_x);
-        groupStartYInput.value = formatNumber(group.start_y);
-        numQuestionsInput.value = group.num_questions;
-        optionsInput.value = group.options.join(",");
+        groupFreePosLabel.textContent = freeAxis === "x" ? "Start X" : "Start Y";
+        groupFreePosInput.value = formatNumber(group[`start_${freeAxis}`]);
         rowSpacingInput.value = formatNumber(group.row_spacing);
         colSpacingInput.value = formatNumber(group.col_spacing);
         startQuestionNumInput.value = group.start_question_num;
-        verticalOptionsInput.checked = group.vertical_options;
     }
 }
 
@@ -1066,16 +1080,26 @@ function updateRenderedGroupPosition(groupId) {
     groupNode.setAttribute("transform", `translate(${group.start_x}, ${group.start_y})`);
 }
 
-function updateRenderedBubblePosition(groupId, rowIdx, colIdx, x, y) {
-    const bubbleNode = overlayLayer.querySelector(
-        `.bubble-item[data-group-id="${CSS.escape(groupId)}"][data-row-idx="${rowIdx}"][data-col-idx="${colIdx}"]`
-    );
+// Moves a single group by (dx, dy). The free-axis component only affects
+// this group; the locked-axis component is applied to every group in the
+// field so they all stay aligned on that shared axis.
+function moveGroupBy(field, group, dx, dy) {
+    const lockedAxis = getLockedAxis(field);
+    const freeAxis = getFreeAxis(field);
+    const deltas = { x: dx, y: dy };
 
-    if (!bubbleNode) {
-        return;
+    group[`start_${freeAxis}`] += deltas[freeAxis];
+
+    const lockedDelta = deltas[lockedAxis];
+
+    if (lockedDelta) {
+        field.groups.forEach((g) => {
+            g[`start_${lockedAxis}`] += lockedDelta;
+        });
     }
 
-    bubbleNode.setAttribute("transform", `translate(${x}, ${y})`);
+    field.groups.forEach((g) => updateRenderedGroupPosition(g.id));
+    updateRenderedFieldHitbox(field.id);
 }
 
 function updateRenderedAnchor(anchorId) {
@@ -1176,7 +1200,7 @@ function updateRenderedGroupGrid(groupId) {
     bubbleNodes.forEach((bubbleNode) => {
         const rowIdx = Number(bubbleNode.dataset.rowIdx);
         const colIdx = Number(bubbleNode.dataset.colIdx);
-        const position = getBubblePosition(group, rowIdx, colIdx);
+        const position = getBubbleDefaultPosition(field, group, rowIdx, colIdx);
 
         bubbleNode.setAttribute(
             "transform",
@@ -1206,9 +1230,9 @@ function updateRenderedGroupGrid(groupId) {
 }
 
 function applyGroupSpacingFromGridResize(field, group, newGridWidth, newGridHeight) {
-    if (group.vertical_options) {
-        const numQuestions = group.num_questions;
-        const numOptions = group.options.length;
+    if (field.vertical_options) {
+        const numQuestions = field.num_questions;
+        const numOptions = field.options.length;
 
         if (numQuestions > 1) {
             const newColSpacing = (newGridWidth - field.bubble_w) / (numQuestions - 1);
@@ -1225,8 +1249,8 @@ function applyGroupSpacingFromGridResize(field, group, newGridWidth, newGridHeig
         return;
     }
 
-    const numCols = group.options.length;
-    const numRows = group.num_questions;
+    const numCols = field.options.length;
+    const numRows = field.num_questions;
 
     if (numCols > 1) {
         const newColSpacing = (newGridWidth - field.bubble_w) / (numCols - 1);
@@ -1261,7 +1285,6 @@ function moveFieldBy(fieldId, dx, dy) {
 function setupInteractions() {
     interact(".field-hitbox").unset();
     interact(".group-grid").unset();
-    interact(".bubble-item").unset();
     interact(".bubble-size-handle").unset();
     interact(".group-grid-size-handle").unset();
     interact(".anchor-item").unset();
@@ -1295,8 +1318,11 @@ function setupInteractions() {
         }
     });
 
+    // Dragging anywhere on a group (including its bubbles) moves that group.
+    // Bubbles are no longer individually draggable - only bubble resize and
+    // grid resize handles are excluded here so their own listeners fire.
     interact(".group-grid").draggable({
-        ignoreFrom: ".bubble-item, .bubble-size-handle, .group-grid-size-handle",
+        ignoreFrom: ".bubble-size-handle, .group-grid-size-handle",
 
         listeners: {
             start(event) {
@@ -1307,69 +1333,22 @@ function setupInteractions() {
 
             move(event) {
                 const groupId = event.target.dataset.groupId;
+                const field = getFieldByGroupId(groupId);
                 const group = getGroupById(groupId);
 
-                if (!group) {
+                if (!field || !group) {
                     return;
                 }
 
                 const delta = getSvgDeltaFromInteractEvent(event);
 
-                group.start_x += delta.dx;
-                group.start_y += delta.dy;
-
-                updateRenderedGroupPosition(groupId);
-                updateRenderedFieldHitbox(group.id.split("|")[0]);
+                moveGroupBy(field, group, delta.dx, delta.dy);
                 scheduleRedrawConfig();
             },
 
             end() {
                 redrawCanvas();
                 redrawConfig();
-            }
-        }
-    });
-
-    interact(".bubble-item").draggable({
-        ignoreFrom: ".bubble-size-handle",
-
-        listeners: {
-            start(event) {
-                const groupId = event.target.dataset.groupId;
-
-                selectGroup(groupId);
-            },
-
-            move(event) {
-                const groupId = event.target.dataset.groupId;
-                const rowIdx = Number(event.target.dataset.rowIdx);
-                const colIdx = Number(event.target.dataset.colIdx);
-                const group = getGroupById(groupId);
-
-                if (!group) {
-                    return;
-                }
-
-                const defaultPosition = getBubbleDefaultPosition(group, rowIdx, colIdx);
-                const currentPosition = getBubblePosition(group, rowIdx, colIdx);
-                const override = getOrCreateOverride(
-                    group,
-                    rowIdx,
-                    colIdx,
-                    defaultPosition.x,
-                    defaultPosition.y
-                );
-
-                const delta = getSvgDeltaFromInteractEvent(event);
-
-                override.x = currentPosition.x + delta.dx;
-                override.y = currentPosition.y + delta.dy;
-
-                updateRenderedBubblePosition(groupId, rowIdx, colIdx, override.x, override.y);
-            },
-
-            end() {
-                redrawCanvas();
             }
         }
     });
@@ -1609,6 +1588,77 @@ bubbleHInput.addEventListener("input", () => {
     redrawCanvas();
 });
 
+fieldNumQuestionsInput.addEventListener("input", () => {
+    const field = getSelectedField();
+
+    if (!field) {
+        return;
+    }
+
+    field.num_questions = Math.max(1, Number(fieldNumQuestionsInput.value) || 1);
+
+    updateEditorDefaultsFromField(field);
+    redrawCanvas();
+});
+
+fieldOptionsInput.addEventListener("input", () => {
+    const field = getSelectedField();
+
+    if (!field) {
+        return;
+    }
+
+    const options = parseOptions(fieldOptionsInput.value);
+
+    field.options = options.length > 0 ? options : ["A"];
+
+    updateEditorDefaultsFromField(field);
+    redrawCanvas();
+});
+
+fieldVerticalOptionsInput.addEventListener("change", () => {
+    const field = getSelectedField();
+
+    if (!field) {
+        return;
+    }
+
+    field.vertical_options = fieldVerticalOptionsInput.checked;
+
+    // The locked axis just changed - re-sync every group onto the new
+    // shared coordinate (taken from the first group) so the field
+    // immediately remains a valid grid-of-grids again.
+    const lockedAxis = getLockedAxis(field);
+
+    if (field.groups.length > 0) {
+        const lockedValue = field.groups[0][`start_${lockedAxis}`];
+
+        field.groups.forEach((g) => {
+            g[`start_${lockedAxis}`] = lockedValue;
+        });
+    }
+
+    updateEditorDefaultsFromField(field);
+    redrawAll();
+});
+
+fieldLockedPosInput.addEventListener("input", () => {
+    const field = getSelectedField();
+
+    if (!field || field.groups.length === 0) {
+        return;
+    }
+
+    const lockedAxis = getLockedAxis(field);
+    const value = Number(fieldLockedPosInput.value) || 0;
+
+    field.groups.forEach((g) => {
+        g[`start_${lockedAxis}`] = value;
+    });
+
+    redrawCanvas();
+});
+
 groupNameInput.addEventListener("input", () => {
     const group = getSelectedGroup();
 
@@ -1621,63 +1671,18 @@ groupNameInput.addEventListener("input", () => {
     redrawField();
 });
 
-groupStartXInput.addEventListener("input", () => {
+groupFreePosInput.addEventListener("input", () => {
+    const field = getSelectedField();
     const group = getSelectedGroup();
 
-    if (!group) {
+    if (!field || !group) {
         return;
     }
 
-    group.start_x = Number(groupStartXInput.value) || 0;
+    const freeAxis = getFreeAxis(field);
 
-    redrawCanvas();
-});
+    group[`start_${freeAxis}`] = Number(groupFreePosInput.value) || 0;
 
-groupStartYInput.addEventListener("input", () => {
-    const group = getSelectedGroup();
-
-    if (!group) {
-        return;
-    }
-
-    group.start_y = Number(groupStartYInput.value) || 0;
-
-    redrawCanvas();
-});
-
-numQuestionsInput.addEventListener("input", () => {
-    const group = getSelectedGroup();
-
-    if (!group) {
-        return;
-    }
-
-    group.num_questions = Math.max(1, Number(numQuestionsInput.value) || 1);
-
-    group.overrides = group.overrides.filter((override) => {
-        return override.row_idx < group.num_questions;
-    });
-
-    updateEditorDefaultsFromGroup(group);
-    redrawCanvas();
-});
-
-optionsInput.addEventListener("input", () => {
-    const group = getSelectedGroup();
-
-    if (!group) {
-        return;
-    }
-
-    const options = parseOptions(optionsInput.value);
-
-    group.options = options.length > 0 ? options : ["A"];
-
-    group.overrides = group.overrides.filter((override) => {
-        return override.col_idx < group.options.length;
-    });
-
-    updateEditorDefaultsFromGroup(group);
     redrawCanvas();
 });
 
@@ -1715,31 +1720,6 @@ startQuestionNumInput.addEventListener("input", () => {
     }
 
     group.start_question_num = Math.max(1, Number(startQuestionNumInput.value) || 1);
-});
-
-verticalOptionsInput.addEventListener("change", () => {
-    const group = getSelectedGroup();
-
-    if (!group) {
-        return;
-    }
-
-    group.vertical_options = verticalOptionsInput.checked;
-
-    updateEditorDefaultsFromGroup(group);
-    redrawCanvas();
-});
-
-clearOverridesButton.addEventListener("click", () => {
-    const group = getSelectedGroup();
-
-    if (!group) {
-        return;
-    }
-
-    group.overrides = [];
-
-    redrawCanvas();
 });
 
 // Defaults panel
@@ -1902,7 +1882,7 @@ duplicateButton.addEventListener("click", () => {
             return;
         }
 
-        const clonedGroup = cloneGroup(group, field.id);
+        const clonedGroup = duplicateGroupInField(group, field);
 
         field.groups.push(clonedGroup);
 
@@ -2031,29 +2011,33 @@ importBlueprintInput.addEventListener("change", async (event) => {
             field.bubble_h = 20;
         }
 
+        // Rows/cols/orientation used to live on each group. Migrate from the
+        // first group if the field itself doesn't carry them yet.
+        const legacyGroup = field.groups && field.groups[0];
+
+        if (field.num_questions === undefined) {
+            field.num_questions = (legacyGroup && legacyGroup.num_questions) || 4;
+        }
+
+        if (!field.options) {
+            field.options = (legacyGroup && legacyGroup.options) || ["A", "B", "C", "D"];
+        }
+
+        if (field.vertical_options === undefined) {
+            field.vertical_options = Boolean(legacyGroup && legacyGroup.vertical_options);
+        }
+
         field.groups.forEach((group, index) => {
             if (!group.name) {
                 group.name = `Group ${index + 1}`;
             }
 
-            if (!group.overrides) {
-                group.overrides = [];
+            if (group.start_x === undefined) {
+                group.start_x = 100;
             }
 
-            if (!group.options) {
-                group.options = ["A", "B", "C", "D"];
-            }
-
-            if (group.start_question_num === undefined) {
-                group.start_question_num = 1;
-            }
-
-            if (group.vertical_options === undefined) {
-                group.vertical_options = false;
-            }
-
-            if (group.num_questions === undefined) {
-                group.num_questions = 4;
+            if (group.start_y === undefined) {
+                group.start_y = 100;
             }
 
             if (group.row_spacing === undefined) {
@@ -2063,7 +2047,28 @@ importBlueprintInput.addEventListener("change", async (event) => {
             if (group.col_spacing === undefined) {
                 group.col_spacing = 40;
             }
+
+            if (group.start_question_num === undefined) {
+                group.start_question_num = 1;
+            }
+
+            // Overrides and per-group grid config no longer exist.
+            delete group.overrides;
+            delete group.num_questions;
+            delete group.options;
+            delete group.vertical_options;
         });
+
+        // Enforce the axis lock in case imported data is inconsistent.
+        const lockedAxis = getLockedAxis(field);
+
+        if (field.groups.length > 0) {
+            const lockedValue = field.groups[0][`start_${lockedAxis}`];
+
+            field.groups.forEach((g) => {
+                g[`start_${lockedAxis}`] = lockedValue;
+            });
+        }
     });
 
     selectedFieldId = null;
@@ -2131,16 +2136,13 @@ canvasWrap.addEventListener("wheel", (event) => {
 function moveSelectedBy(dx, dy) {
     if (selectedGroupId) {
         const group = getGroupById(selectedGroupId);
+        const field = getFieldByGroupId(selectedGroupId);
 
-        if (!group) {
+        if (!group || !field) {
             return;
         }
 
-        group.start_x += dx;
-        group.start_y += dy;
-
-        updateRenderedGroupPosition(group.id);
-        updateRenderedFieldHitbox(group.id.split("|")[0]);
+        moveGroupBy(field, group, dx, dy);
         redrawConfig();
         return;
     }
@@ -2219,7 +2221,7 @@ window.addEventListener("keyup", (event) => {
 // Canvas panning
 canvasWrap.addEventListener("pointerdown", (event) => {
     const clickedInteractiveItem = event.target.closest(
-        ".field-hitbox, .group-grid, .bubble-item, .bubble-size-handle, .group-grid-size-handle, .anchor-item, .anchor-rect, .anchor-size-handle"
+        ".field-hitbox, .group-grid, .bubble-size-handle, .group-grid-size-handle, .anchor-item, .anchor-rect, .anchor-size-handle"
     );
 
     if (clickedInteractiveItem) {
