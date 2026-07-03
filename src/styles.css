@@ -188,7 +188,7 @@ input[type="file"] {
     pointer-events: none;
 }
 
-.entry-grid {
+.group-grid {
     cursor: move;
 }
 
@@ -201,7 +201,7 @@ input[type="file"] {
 }
 
 .bubble-size-handle,
-.entry-grid-size-handle,
+.group-grid-size-handle,
 .anchor-size-handle {
     cursor: nwse-resize;
 }
@@ -275,7 +275,7 @@ body.is-resizing * {
     vector-effect: non-scaling-stroke;
 }
 
-.entry-grid-box {
+.group-grid-box {
     cursor: move;
 }
 
@@ -283,7 +283,7 @@ body.is-resizing * {
     vector-effect: non-scaling-stroke;
 }
 
-.entry-grid-box,
+.group-grid-box,
 .bubble-shape,
 .anchor-rect {
     vector-effect: non-scaling-stroke;

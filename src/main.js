@@ -19,7 +19,7 @@ const NORMAL_BUBBLE_STROKE = "#111827";
 // Buttons / controls
 const uploadImageInput = document.getElementById("image_upload");
 const addFieldButton = document.getElementById("new_field");
-const addEntryButton = document.getElementById("new_entry");
+const addGroupButton = document.getElementById("new_group");
 const deleteButton = document.getElementById("delete_button");
 const duplicateButton = document.getElementById("duplicate_button");
 
@@ -47,8 +47,8 @@ const fieldList = document.getElementById("field_list");
 // Config panels
 const fieldConfigEmpty = document.getElementById("field_config_empty");
 const fieldConfigForm = document.getElementById("field_config_form");
-const entryConfigEmpty = document.getElementById("entry_config_empty");
-const entryConfigForm = document.getElementById("entry_config_form");
+const groupConfigEmpty = document.getElementById("group_config_empty");
+const groupConfigForm = document.getElementById("group_config_form");
 
 const fieldNameInput = document.getElementById("field_name_input");
 const fieldTypeInput = document.getElementById("field_type_input");
@@ -56,9 +56,9 @@ const bubbleShapeInput = document.getElementById("bubble_shape_input");
 const bubbleWInput = document.getElementById("bubble_w_input");
 const bubbleHInput = document.getElementById("bubble_h_input");
 
-const entryNameInput = document.getElementById("entry_name_input");
-const entryStartXInput = document.getElementById("entry_start_x_input");
-const entryStartYInput = document.getElementById("entry_start_y_input");
+const groupNameInput = document.getElementById("group_name_input");
+const groupStartXInput = document.getElementById("group_start_x_input");
+const groupStartYInput = document.getElementById("group_start_y_input");
 const numQuestionsInput = document.getElementById("num_questions_input");
 const optionsInput = document.getElementById("options_input");
 const rowSpacingInput = document.getElementById("row_spacing_input");
@@ -88,7 +88,7 @@ let fields = [];
 let anchors = [];
 
 let selectedFieldId = null;
-let selectedEntryId = null;
+let selectedGroupId = null;
 let selectedAnchorId = null;
 
 let configRedrawFrame = null;
@@ -185,12 +185,12 @@ function updateEditorDefaultsFromField(field) {
     updateEditorDefault("bubble_h", field.bubble_h);
 }
 
-function updateEditorDefaultsFromEntry(entry) {
-    updateEditorDefault("num_questions", entry.num_questions);
-    updateEditorDefault("options", structuredClone(entry.options));
-    updateEditorDefault("row_spacing", entry.row_spacing);
-    updateEditorDefault("col_spacing", entry.col_spacing);
-    updateEditorDefault("vertical_options", entry.vertical_options);
+function updateEditorDefaultsFromGroup(group) {
+    updateEditorDefault("num_questions", group.num_questions);
+    updateEditorDefault("options", structuredClone(group.options));
+    updateEditorDefault("row_spacing", group.row_spacing);
+    updateEditorDefault("col_spacing", group.col_spacing);
+    updateEditorDefault("vertical_options", group.vertical_options);
 }
 
 function resetEditorDefaults() {
@@ -211,7 +211,7 @@ function resetEditorDefaults() {
 
 function useSelectedAsDefault() {
     const field = getSelectedField();
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
     if (field) {
         editorDefaults.bubble_shape = field.bubble_shape;
@@ -219,12 +219,12 @@ function useSelectedAsDefault() {
         editorDefaults.bubble_h = field.bubble_h;
     }
 
-    if (entry) {
-        editorDefaults.num_questions = entry.num_questions;
-        editorDefaults.options = structuredClone(entry.options);
-        editorDefaults.row_spacing = entry.row_spacing;
-        editorDefaults.col_spacing = entry.col_spacing;
-        editorDefaults.vertical_options = entry.vertical_options;
+    if (group) {
+        editorDefaults.num_questions = group.num_questions;
+        editorDefaults.options = structuredClone(group.options);
+        editorDefaults.row_spacing = group.row_spacing;
+        editorDefaults.col_spacing = group.col_spacing;
+        editorDefaults.vertical_options = group.vertical_options;
     }
 
     saveEditorDefaults();
@@ -267,19 +267,19 @@ function getFieldById(fieldId) {
     return fields.find((field) => field.id === fieldId) || null;
 }
 
-function getEntryById(entryId) {
-    const fieldId = entryId.split("|")[0];
+function getGroupById(groupId) {
+    const fieldId = groupId.split("|")[0];
     const field = getFieldById(fieldId);
 
     if (!field) {
         return null;
     }
 
-    return field.entries.find((entry) => entry.id === entryId) || null;
+    return field.groups.find((group) => group.id === groupId) || null;
 }
 
-function getFieldByEntryId(entryId) {
-    const fieldId = entryId.split("|")[0];
+function getFieldByGroupId(groupId) {
+    const fieldId = groupId.split("|")[0];
 
     return getFieldById(fieldId);
 }
@@ -289,8 +289,8 @@ function getAnchorById(anchorId) {
 }
 
 function getSelectedField() {
-    if (selectedEntryId) {
-        return getFieldByEntryId(selectedEntryId);
+    if (selectedGroupId) {
+        return getFieldByGroupId(selectedGroupId);
     }
 
     if (selectedFieldId) {
@@ -300,22 +300,22 @@ function getSelectedField() {
     return null;
 }
 
-function getSelectedEntry() {
-    if (!selectedEntryId) {
+function getSelectedGroup() {
+    if (!selectedGroupId) {
         return null;
     }
 
-    return getEntryById(selectedEntryId);
+    return getGroupById(selectedGroupId);
 }
 
-function getOverride(entry, rowIdx, colIdx) {
-    return entry.overrides.find((override) => {
+function getOverride(group, rowIdx, colIdx) {
+    return group.overrides.find((override) => {
         return override.row_idx === rowIdx && override.col_idx === colIdx;
     }) || null;
 }
 
-function getOrCreateOverride(entry, rowIdx, colIdx, defaultX, defaultY) {
-    let override = getOverride(entry, rowIdx, colIdx);
+function getOrCreateOverride(group, rowIdx, colIdx, defaultX, defaultY) {
+    let override = getOverride(group, rowIdx, colIdx);
 
     if (!override) {
         override = {
@@ -325,7 +325,7 @@ function getOrCreateOverride(entry, rowIdx, colIdx, defaultX, defaultY) {
             y: defaultY
         };
 
-        entry.overrides.push(override);
+        group.overrides.push(override);
     }
 
     return override;
@@ -357,23 +357,23 @@ function getSvgDeltaFromInteractEvent(event) {
     };
 }
 
-function getBubbleDefaultPosition(entry, rowIdx, colIdx) {
-    if (entry.vertical_options) {
+function getBubbleDefaultPosition(group, rowIdx, colIdx) {
+    if (group.vertical_options) {
         return {
-            x: entry.col_spacing * rowIdx,
-            y: entry.row_spacing * colIdx
+            x: group.col_spacing * rowIdx,
+            y: group.row_spacing * colIdx
         };
     }
 
     return {
-        x: entry.col_spacing * colIdx,
-        y: entry.row_spacing * rowIdx
+        x: group.col_spacing * colIdx,
+        y: group.row_spacing * rowIdx
     };
 }
 
-function getBubblePosition(entry, rowIdx, colIdx) {
-    const defaultPosition = getBubbleDefaultPosition(entry, rowIdx, colIdx);
-    const override = getOverride(entry, rowIdx, colIdx);
+function getBubblePosition(group, rowIdx, colIdx) {
+    const defaultPosition = getBubbleDefaultPosition(group, rowIdx, colIdx);
+    const override = getOverride(group, rowIdx, colIdx);
 
     if (!override) {
         return defaultPosition;
@@ -385,57 +385,57 @@ function getBubblePosition(entry, rowIdx, colIdx) {
     };
 }
 
-function getAbsoluteBubblePosition(entry, rowIdx, colIdx, field) {
-    const localPosition = getBubblePosition(entry, rowIdx, colIdx);
+function getAbsoluteBubblePosition(group, rowIdx, colIdx, field) {
+    const localPosition = getBubblePosition(group, rowIdx, colIdx);
 
     return {
-        x: entry.start_x + localPosition.x + field.bubble_w / 2,
-        y: entry.start_y + localPosition.y + field.bubble_h / 2
+        x: group.start_x + localPosition.x + field.bubble_w / 2,
+        y: group.start_y + localPosition.y + field.bubble_h / 2
     };
 }
 
-function getGridWidth(field, entry) {
-    if (entry.vertical_options) {
-        const numQuestions = entry.num_questions;
+function getGridWidth(field, group) {
+    if (group.vertical_options) {
+        const numQuestions = group.num_questions;
 
         if (numQuestions <= 1) {
             return field.bubble_w;
         }
 
-        return field.bubble_w + entry.col_spacing * (numQuestions - 1);
+        return field.bubble_w + group.col_spacing * (numQuestions - 1);
     }
 
-    const numOptions = entry.options.length;
+    const numOptions = group.options.length;
 
     if (numOptions <= 1) {
         return field.bubble_w;
     }
 
-    return field.bubble_w + entry.col_spacing * (numOptions - 1);
+    return field.bubble_w + group.col_spacing * (numOptions - 1);
 }
 
-function getGridHeight(field, entry) {
-    if (entry.vertical_options) {
-        const numOptions = entry.options.length;
+function getGridHeight(field, group) {
+    if (group.vertical_options) {
+        const numOptions = group.options.length;
 
         if (numOptions <= 1) {
             return field.bubble_h;
         }
 
-        return field.bubble_h + entry.row_spacing * (numOptions - 1);
+        return field.bubble_h + group.row_spacing * (numOptions - 1);
     }
 
-    const numQuestions = entry.num_questions;
+    const numQuestions = group.num_questions;
 
     if (numQuestions <= 1) {
         return field.bubble_h;
     }
 
-    return field.bubble_h + entry.row_spacing * (numQuestions - 1);
+    return field.bubble_h + group.row_spacing * (numQuestions - 1);
 }
 
 function getFieldBounds(field) {
-    if (!field.entries.length) {
+    if (!field.groups.length) {
         return null;
     }
 
@@ -444,14 +444,14 @@ function getFieldBounds(field) {
     let maxX = -Infinity;
     let maxY = -Infinity;
 
-    field.entries.forEach((entry) => {
-        const gridWidth = getGridWidth(field, entry);
-        const gridHeight = getGridHeight(field, entry);
+    field.groups.forEach((group) => {
+        const gridWidth = getGridWidth(field, group);
+        const gridHeight = getGridHeight(field, group);
 
-        minX = Math.min(minX, entry.start_x);
-        minY = Math.min(minY, entry.start_y);
-        maxX = Math.max(maxX, entry.start_x + gridWidth);
-        maxY = Math.max(maxY, entry.start_y + gridHeight);
+        minX = Math.min(minX, group.start_x);
+        minY = Math.min(minY, group.start_y);
+        maxX = Math.max(maxX, group.start_x + gridWidth);
+        maxY = Math.max(maxY, group.start_y + gridHeight);
     });
 
     return {
@@ -469,7 +469,7 @@ function createFieldHitbox(field) {
         return null;
     }
 
-    const isSelectedField = field.id === selectedFieldId && selectedEntryId === null;
+    const isSelectedField = field.id === selectedFieldId && selectedGroupId === null;
 
     const hitbox = createSvgElement("rect");
 
@@ -541,10 +541,10 @@ function redrawAll() {
     redrawConfig();
 }
 
-function getDefaultEntryPosition(field) {
-    const lastEntry = field.entries[field.entries.length - 1];
+function getDefaultGroupPosition(field) {
+    const lastGroup = field.groups[field.groups.length - 1];
 
-    if (!lastEntry) {
+    if (!lastGroup) {
         return {
             x: 100,
             y: 100
@@ -552,25 +552,25 @@ function getDefaultEntryPosition(field) {
     }
 
     return {
-        x: lastEntry.start_x + 40,
-        y: lastEntry.start_y + 40
+        x: lastGroup.start_x + 40,
+        y: lastGroup.start_y + 40
     };
 }
 
 function getNextStartQuestionNum(field) {
-    const lastEntry = field.entries[field.entries.length - 1];
+    const lastGroup = field.groups[field.groups.length - 1];
 
-    if (!lastEntry) {
+    if (!lastGroup) {
         return 1;
     }
 
-    return lastEntry.start_question_num + lastEntry.num_questions;
+    return lastGroup.start_question_num + lastGroup.num_questions;
 }
 
 function newField() {
     const idx = fields.length + 1;
     const fieldId = crypto.randomUUID();
-    const entryId = `${fieldId}|${crypto.randomUUID()}`;
+    const groupId = `${fieldId}|${crypto.randomUUID()}`;
 
     return {
         id: fieldId,
@@ -579,10 +579,10 @@ function newField() {
         bubble_shape: editorDefaults.bubble_shape,
         bubble_w: editorDefaults.bubble_w,
         bubble_h: editorDefaults.bubble_h,
-        entries: [
+        groups: [
             {
-                id: entryId,
-                name: "Entry 1",
+                id: groupId,
+                name: "Group 1",
                 start_x: 100,
                 start_y: 100,
                 num_questions: editorDefaults.num_questions,
@@ -597,20 +597,20 @@ function newField() {
     };
 }
 
-function newEntry(fieldId) {
+function newGroup(fieldId) {
     const field = getFieldById(fieldId);
 
     if (!field) {
         return null;
     }
 
-    const idx = field.entries.length + 1;
-    const entryId = `${fieldId}|${crypto.randomUUID()}`;
-    const position = getDefaultEntryPosition(field);
+    const idx = field.groups.length + 1;
+    const groupId = `${fieldId}|${crypto.randomUUID()}`;
+    const position = getDefaultGroupPosition(field);
 
     return {
-        id: entryId,
-        name: `Entry ${idx}`,
+        id: groupId,
+        name: `Group ${idx}`,
         start_x: position.x,
         start_y: position.y,
         num_questions: editorDefaults.num_questions,
@@ -634,13 +634,13 @@ function newAnchor() {
     };
 }
 
-function cloneEntry(entry, newFieldId) {
+function cloneGroup(group, newFieldId) {
     return {
-        ...structuredClone(entry),
+        ...structuredClone(group),
         id: `${newFieldId}|${crypto.randomUUID()}`,
-        name: `${entry.name} Copy`,
-        start_x: entry.start_x + 30,
-        start_y: entry.start_y + 30
+        name: `${group.name} Copy`,
+        start_x: group.start_x + 30,
+        start_y: group.start_y + 30
     };
 }
 
@@ -651,11 +651,11 @@ function cloneField(field) {
         ...structuredClone(field),
         id: newFieldId,
         name: `${field.name} Copy`,
-        entries: []
+        groups: []
     };
 
-    clonedField.entries = field.entries.map((entry) => {
-        return cloneEntry(entry, newFieldId);
+    clonedField.groups = field.groups.map((group) => {
+        return cloneGroup(group, newFieldId);
     });
 
     return clonedField;
@@ -699,30 +699,38 @@ function buildTemplateJson() {
                     width: Math.round(field.bubble_w),
                     height: Math.round(field.bubble_h)
                 },
-                entries: field.entries.flatMap((entry) => {
+                groups: field.groups.map((group) => {
                     const exportedEntries = [];
 
-                    for (let rowIdx = 0; rowIdx < entry.num_questions; rowIdx++) {
-                        const question = entry.start_question_num + rowIdx;
+                    for (let rowIdx = 0; rowIdx < group.num_questions; rowIdx++) {
+                        const question = group.start_question_num + rowIdx;
                         const bubbles = [];
 
-                        for (let colIdx = 0; colIdx < entry.options.length; colIdx++) {
-                            const absolutePosition = getAbsoluteBubblePosition(entry, rowIdx, colIdx, field);
+                        for (let colIdx = 0; colIdx < group.options.length; colIdx++) {
+                            const absolutePosition = getAbsoluteBubblePosition(group, rowIdx, colIdx, field);
 
                             bubbles.push({
                                 x: Math.round(absolutePosition.x),
                                 y: Math.round(absolutePosition.y),
-                                value: entry.options[colIdx]
+                                value: group.options[colIdx]
                             });
                         }
 
-                        exportedEntries.push({
-                            question: question,
-                            bubbles: bubbles
-                        });
+                        if (field.type == "identifier") {
+                            exportedEntries.push({
+                                bubbles: bubbles
+                            });
+                        } else if (field.type == "answers") {
+                            exportedEntries.push({
+                                question: question,
+                                bubbles: bubbles
+                            });
+                        }
                     }
 
-                    return exportedEntries;
+                    return {
+                        entries: exportedEntries
+                    };
                 })
             };
         })
@@ -740,36 +748,36 @@ function redrawField() {
         fieldButton.textContent = field.name;
         fieldButton.dataset.id = field.id;
 
-        if (field.id === selectedFieldId && selectedEntryId === null) {
+        if (field.id === selectedFieldId && selectedGroupId === null) {
             fieldButton.classList.add("selected");
         }
 
         fieldLi.appendChild(fieldButton);
 
-        const entryList = document.createElement("ul");
+        const groupList = document.createElement("ul");
 
-        field.entries.forEach((entry) => {
-            const entryLi = document.createElement("li");
+        field.groups.forEach((group) => {
+            const groupLi = document.createElement("li");
 
-            const entryButton = document.createElement("button");
-            entryButton.classList.add("list-item");
-            entryButton.textContent = entry.name;
-            entryButton.dataset.id = entry.id;
+            const groupButton = document.createElement("button");
+            groupButton.classList.add("list-item");
+            groupButton.textContent = group.name;
+            groupButton.dataset.id = group.id;
 
-            if (entry.id === selectedEntryId) {
-                entryButton.classList.add("selected");
+            if (group.id === selectedGroupId) {
+                groupButton.classList.add("selected");
             }
 
-            entryLi.appendChild(entryButton);
-            entryList.appendChild(entryLi);
+            groupLi.appendChild(groupButton);
+            groupList.appendChild(groupLi);
         });
 
-        fieldLi.appendChild(entryList);
+        fieldLi.appendChild(groupList);
         fieldList.appendChild(fieldLi);
     });
 }
 
-function createBubbleShape(field, entry, rowIdx, colIdx) {
+function createBubbleShape(field, group, rowIdx, colIdx) {
     const bubbleShape = field.bubble_shape;
     const bubbleW = field.bubble_w;
     const bubbleH = field.bubble_h;
@@ -778,11 +786,11 @@ function createBubbleShape(field, entry, rowIdx, colIdx) {
 
     shape.classList.add("bubble-shape");
     shape.dataset.fieldId = field.id;
-    shape.dataset.entryId = entry.id;
+    shape.dataset.groupId = group.id;
     shape.dataset.rowIdx = rowIdx;
     shape.dataset.colIdx = colIdx;
 
-    if (entry.id === selectedEntryId) {
+    if (group.id === selectedGroupId) {
         shape.classList.add("selected");
     }
 
@@ -799,20 +807,20 @@ function createBubbleShape(field, entry, rowIdx, colIdx) {
     }
 
     shape.setAttribute("fill", "none");
-    shape.setAttribute("stroke", entry.id === selectedEntryId ? BUBBLE_SELECTED_STROKE : NORMAL_BUBBLE_STROKE);
-    shape.setAttribute("stroke-width", entry.id === selectedEntryId ? 1.5 : 1);
+    shape.setAttribute("stroke", group.id === selectedGroupId ? BUBBLE_SELECTED_STROKE : NORMAL_BUBBLE_STROKE);
+    shape.setAttribute("stroke-width", group.id === selectedGroupId ? 1.5 : 1);
     shape.setAttribute("pointer-events", "all");
 
     return shape;
 }
 
-function createBubbleResizeHandle(field, entry) {
+function createBubbleResizeHandle(field, group) {
     const handleSize = 3;
     const handle = createSvgElement("rect");
 
     handle.classList.add("bubble-size-handle");
 
-    if (entry.id !== selectedEntryId) {
+    if (group.id !== selectedGroupId) {
         handle.classList.add("hidden-handle");
     }
 
@@ -823,27 +831,27 @@ function createBubbleResizeHandle(field, entry) {
     handle.setAttribute("fill", "white");
     handle.setAttribute("stroke", "black");
     handle.setAttribute("stroke-width", 1);
-    handle.setAttribute("pointer-events", entry.id === selectedEntryId ? "all" : "none");
+    handle.setAttribute("pointer-events", group.id === selectedGroupId ? "all" : "none");
 
     return handle;
 }
 
-function createBubbleGroup(field, entry, rowIdx, colIdx) {
-    const position = getBubblePosition(entry, rowIdx, colIdx);
+function createBubbleGroup(field, group, rowIdx, colIdx) {
+    const position = getBubblePosition(group, rowIdx, colIdx);
     const gBubble = createSvgElement("g");
 
     gBubble.classList.add("bubble-item");
     gBubble.dataset.fieldId = field.id;
-    gBubble.dataset.entryId = entry.id;
+    gBubble.dataset.groupId = group.id;
     gBubble.dataset.rowIdx = rowIdx;
     gBubble.dataset.colIdx = colIdx;
     gBubble.setAttribute("transform", `translate(${position.x}, ${position.y})`);
 
-    const shape = createBubbleShape(field, entry, rowIdx, colIdx);
-    const handle = createBubbleResizeHandle(field, entry);
+    const shape = createBubbleShape(field, group, rowIdx, colIdx);
+    const handle = createBubbleResizeHandle(field, group);
 
     handle.dataset.fieldId = field.id;
-    handle.dataset.entryId = entry.id;
+    handle.dataset.groupId = group.id;
     handle.dataset.rowIdx = rowIdx;
     handle.dataset.colIdx = colIdx;
 
@@ -853,20 +861,20 @@ function createBubbleGroup(field, entry, rowIdx, colIdx) {
     return gBubble;
 }
 
-function createEntryResizeBox(field, entry) {
-    const gridWidth = getGridWidth(field, entry);
-    const gridHeight = getGridHeight(field, entry);
+function createGroupResizeBox(field, group) {
+    const gridWidth = getGridWidth(field, group);
+    const gridHeight = getGridHeight(field, group);
     const box = createSvgElement("rect");
 
-    box.classList.add("entry-grid-box");
+    box.classList.add("group-grid-box");
     box.dataset.fieldId = field.id;
-    box.dataset.entryId = entry.id;
+    box.dataset.groupId = group.id;
     box.setAttribute("x", 0);
     box.setAttribute("y", 0);
     box.setAttribute("width", gridWidth);
     box.setAttribute("height", gridHeight);
     box.setAttribute("fill", "transparent");
-    box.setAttribute("stroke", entry.id === selectedEntryId ? ENTRY_OUTLINE_STROKE : "transparent");
+    box.setAttribute("stroke", group.id === selectedGroupId ? ENTRY_OUTLINE_STROKE : "transparent");
     box.setAttribute("stroke-width", 1.5);
     box.setAttribute("stroke-dasharray", "3 3");
     box.setAttribute("rx", 4);
@@ -876,20 +884,20 @@ function createEntryResizeBox(field, entry) {
     return box;
 }
 
-function createEntryResizeHandle(field, entry) {
+function createGroupResizeHandle(field, group) {
     const handleSize = 5;
-    const gridWidth = getGridWidth(field, entry);
-    const gridHeight = getGridHeight(field, entry);
+    const gridWidth = getGridWidth(field, group);
+    const gridHeight = getGridHeight(field, group);
     const handle = createSvgElement("rect");
 
-    handle.classList.add("entry-grid-size-handle");
+    handle.classList.add("group-grid-size-handle");
 
-    if (entry.id !== selectedEntryId) {
+    if (group.id !== selectedGroupId) {
         handle.classList.add("hidden-handle");
     }
 
     handle.dataset.fieldId = field.id;
-    handle.dataset.entryId = entry.id;
+    handle.dataset.groupId = group.id;
     handle.setAttribute("x", gridWidth - handleSize / 2);
     handle.setAttribute("y", gridHeight - handleSize / 2);
     handle.setAttribute("width", handleSize);
@@ -897,7 +905,7 @@ function createEntryResizeHandle(field, entry) {
     handle.setAttribute("fill", "white");
     handle.setAttribute("stroke", "black");
     handle.setAttribute("stroke-width", 1);
-    handle.setAttribute("pointer-events", entry.id === selectedEntryId ? "all" : "none");
+    handle.setAttribute("pointer-events", group.id === selectedGroupId ? "all" : "none");
 
     return handle;
 }
@@ -916,32 +924,32 @@ function redrawCanvas() {
             gField.appendChild(fieldHitbox);
         }
 
-        field.entries.forEach((entry) => {
-            const numCols = entry.options.length;
-            const numRows = entry.num_questions;
-            const gEntry = createSvgElement("g");
+        field.groups.forEach((group) => {
+            const numCols = group.options.length;
+            const numRows = group.num_questions;
+            const gGroup = createSvgElement("g");
 
-            gEntry.classList.add("entry-grid");
-            gEntry.dataset.fieldId = field.id;
-            gEntry.dataset.entryId = entry.id;
-            gEntry.setAttribute("transform", `translate(${entry.start_x}, ${entry.start_y})`);
+            gGroup.classList.add("group-grid");
+            gGroup.dataset.fieldId = field.id;
+            gGroup.dataset.groupId = group.id;
+            gGroup.setAttribute("transform", `translate(${group.start_x}, ${group.start_y})`);
 
-            const entryBox = createEntryResizeBox(field, entry);
+            const groupBox = createGroupResizeBox(field, group);
 
-            gEntry.appendChild(entryBox);
+            gGroup.appendChild(groupBox);
 
             for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
                 for (let colIdx = 0; colIdx < numCols; colIdx++) {
-                    const gBubble = createBubbleGroup(field, entry, rowIdx, colIdx);
+                    const gBubble = createBubbleGroup(field, group, rowIdx, colIdx);
 
-                    gEntry.appendChild(gBubble);
+                    gGroup.appendChild(gBubble);
                 }
             }
 
-            const entryResizeHandle = createEntryResizeHandle(field, entry);
+            const groupResizeHandle = createGroupResizeHandle(field, group);
 
-            gEntry.appendChild(entryResizeHandle);
-            gField.appendChild(gEntry);
+            gGroup.appendChild(groupResizeHandle);
+            gField.appendChild(gGroup);
         });
 
         overlayLayer.appendChild(gField);
@@ -993,7 +1001,7 @@ function redrawCanvas() {
 
 function redrawConfig() {
     const field = getSelectedField();
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
     if (!field) {
         fieldConfigEmpty.classList.remove("hidden");
@@ -1009,28 +1017,28 @@ function redrawConfig() {
         bubbleHInput.value = formatNumber(field.bubble_h);
     }
 
-    if (!entry) {
-        entryConfigEmpty.classList.remove("hidden");
-        entryConfigForm.classList.add("hidden");
+    if (!group) {
+        groupConfigEmpty.classList.remove("hidden");
+        groupConfigForm.classList.add("hidden");
     } else {
-        entryConfigEmpty.classList.add("hidden");
-        entryConfigForm.classList.remove("hidden");
+        groupConfigEmpty.classList.add("hidden");
+        groupConfigForm.classList.remove("hidden");
 
-        entryNameInput.value = entry.name;
-        entryStartXInput.value = formatNumber(entry.start_x);
-        entryStartYInput.value = formatNumber(entry.start_y);
-        numQuestionsInput.value = entry.num_questions;
-        optionsInput.value = entry.options.join(",");
-        rowSpacingInput.value = formatNumber(entry.row_spacing);
-        colSpacingInput.value = formatNumber(entry.col_spacing);
-        startQuestionNumInput.value = entry.start_question_num;
-        verticalOptionsInput.checked = entry.vertical_options;
+        groupNameInput.value = group.name;
+        groupStartXInput.value = formatNumber(group.start_x);
+        groupStartYInput.value = formatNumber(group.start_y);
+        numQuestionsInput.value = group.num_questions;
+        optionsInput.value = group.options.join(",");
+        rowSpacingInput.value = formatNumber(group.row_spacing);
+        colSpacingInput.value = formatNumber(group.col_spacing);
+        startQuestionNumInput.value = group.start_question_num;
+        verticalOptionsInput.checked = group.vertical_options;
     }
 }
 
-function selectEntry(entryId) {
-    selectedEntryId = entryId;
-    selectedFieldId = entryId.split("|")[0];
+function selectGroup(groupId) {
+    selectedGroupId = groupId;
+    selectedFieldId = groupId.split("|")[0];
     selectedAnchorId = null;
 
     redrawField();
@@ -1039,33 +1047,33 @@ function selectEntry(entryId) {
 
 function selectField(fieldId) {
     selectedFieldId = fieldId;
-    selectedEntryId = null;
+    selectedGroupId = null;
     selectedAnchorId = null;
 
     redrawAll();
 }
 
-function updateRenderedEntryPosition(entryId) {
-    const entry = getEntryById(entryId);
+function updateRenderedGroupPosition(groupId) {
+    const group = getGroupById(groupId);
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    const entryNode = overlayLayer.querySelector(
-        `.entry-grid[data-entry-id="${CSS.escape(entryId)}"]`
+    const groupNode = overlayLayer.querySelector(
+        `.group-grid[data-group-id="${CSS.escape(groupId)}"]`
     );
 
-    if (!entryNode) {
+    if (!groupNode) {
         return;
     }
 
-    entryNode.setAttribute("transform", `translate(${entry.start_x}, ${entry.start_y})`);
+    groupNode.setAttribute("transform", `translate(${group.start_x}, ${group.start_y})`);
 }
 
-function updateRenderedBubblePosition(entryId, rowIdx, colIdx, x, y) {
+function updateRenderedBubblePosition(groupId, rowIdx, colIdx, x, y) {
     const bubbleNode = overlayLayer.querySelector(
-        `.bubble-item[data-entry-id="${CSS.escape(entryId)}"][data-row-idx="${rowIdx}"][data-col-idx="${colIdx}"]`
+        `.bubble-item[data-group-id="${CSS.escape(groupId)}"][data-row-idx="${rowIdx}"][data-col-idx="${colIdx}"]`
     );
 
     if (!bubbleNode) {
@@ -1145,35 +1153,35 @@ function updateRenderedFieldBubbleSizes(fieldId) {
         handle.setAttribute("y", field.bubble_h - handleSize / 2);
     });
 
-    field.entries.forEach((entry) => {
-        updateRenderedEntryGrid(entry.id);
+    field.groups.forEach((group) => {
+        updateRenderedGroupGrid(group.id);
     });
 
     updateRenderedFieldHitbox(fieldId);
 }
 
-function updateRenderedEntryGrid(entryId) {
-    const field = getFieldByEntryId(entryId);
-    const entry = getEntryById(entryId);
+function updateRenderedGroupGrid(groupId) {
+    const field = getFieldByGroupId(groupId);
+    const group = getGroupById(groupId);
 
-    if (!field || !entry) {
+    if (!field || !group) {
         return;
     }
 
-    const entryNode = overlayLayer.querySelector(
-        `.entry-grid[data-entry-id="${CSS.escape(entryId)}"]`
+    const groupNode = overlayLayer.querySelector(
+        `.group-grid[data-group-id="${CSS.escape(groupId)}"]`
     );
 
-    if (!entryNode) {
+    if (!groupNode) {
         return;
     }
 
-    const bubbleNodes = entryNode.querySelectorAll(".bubble-item");
+    const bubbleNodes = groupNode.querySelectorAll(".bubble-item");
 
     bubbleNodes.forEach((bubbleNode) => {
         const rowIdx = Number(bubbleNode.dataset.rowIdx);
         const colIdx = Number(bubbleNode.dataset.colIdx);
-        const position = getBubblePosition(entry, rowIdx, colIdx);
+        const position = getBubblePosition(group, rowIdx, colIdx);
 
         bubbleNode.setAttribute(
             "transform",
@@ -1181,19 +1189,19 @@ function updateRenderedEntryGrid(entryId) {
         );
     });
 
-    const box = entryNode.querySelector(".entry-grid-box");
+    const box = groupNode.querySelector(".group-grid-box");
 
     if (box) {
-        box.setAttribute("width", getGridWidth(field, entry));
-        box.setAttribute("height", getGridHeight(field, entry));
+        box.setAttribute("width", getGridWidth(field, group));
+        box.setAttribute("height", getGridHeight(field, group));
     }
 
-    const handle = entryNode.querySelector(".entry-grid-size-handle");
+    const handle = groupNode.querySelector(".group-grid-size-handle");
 
     if (handle) {
         const handleSize = Number(handle.getAttribute("width"));
-        const gridWidth = getGridWidth(field, entry);
-        const gridHeight = getGridHeight(field, entry);
+        const gridWidth = getGridWidth(field, group);
+        const gridHeight = getGridHeight(field, group);
 
         handle.setAttribute("x", gridWidth - handleSize / 2);
         handle.setAttribute("y", gridHeight - handleSize / 2);
@@ -1202,39 +1210,39 @@ function updateRenderedEntryGrid(entryId) {
     updateRenderedFieldHitbox(field.id);
 }
 
-function applyEntrySpacingFromGridResize(field, entry, newGridWidth, newGridHeight) {
-    if (entry.vertical_options) {
-        const numQuestions = entry.num_questions;
-        const numOptions = entry.options.length;
+function applyGroupSpacingFromGridResize(field, group, newGridWidth, newGridHeight) {
+    if (group.vertical_options) {
+        const numQuestions = group.num_questions;
+        const numOptions = group.options.length;
 
         if (numQuestions > 1) {
             const newColSpacing = (newGridWidth - field.bubble_w) / (numQuestions - 1);
 
-            entry.col_spacing = Math.max(field.bubble_w + 1, newColSpacing);
+            group.col_spacing = Math.max(field.bubble_w + 1, newColSpacing);
         }
 
         if (numOptions > 1) {
             const newRowSpacing = (newGridHeight - field.bubble_h) / (numOptions - 1);
 
-            entry.row_spacing = Math.max(field.bubble_h + 1, newRowSpacing);
+            group.row_spacing = Math.max(field.bubble_h + 1, newRowSpacing);
         }
 
         return;
     }
 
-    const numCols = entry.options.length;
-    const numRows = entry.num_questions;
+    const numCols = group.options.length;
+    const numRows = group.num_questions;
 
     if (numCols > 1) {
         const newColSpacing = (newGridWidth - field.bubble_w) / (numCols - 1);
 
-        entry.col_spacing = Math.max(field.bubble_w + 1, newColSpacing);
+        group.col_spacing = Math.max(field.bubble_w + 1, newColSpacing);
     }
 
     if (numRows > 1) {
         const newRowSpacing = (newGridHeight - field.bubble_h) / (numRows - 1);
 
-        entry.row_spacing = Math.max(field.bubble_h + 1, newRowSpacing);
+        group.row_spacing = Math.max(field.bubble_h + 1, newRowSpacing);
     }
 }
 
@@ -1245,11 +1253,11 @@ function moveFieldBy(fieldId, dx, dy) {
         return;
     }
 
-    field.entries.forEach((entry) => {
-        entry.start_x += dx;
-        entry.start_y += dy;
+    field.groups.forEach((group) => {
+        group.start_x += dx;
+        group.start_y += dy;
 
-        updateRenderedEntryPosition(entry.id);
+        updateRenderedGroupPosition(group.id);
     });
 
     updateRenderedFieldHitbox(fieldId);
@@ -1257,10 +1265,10 @@ function moveFieldBy(fieldId, dx, dy) {
 
 function setupInteractions() {
     interact(".field-hitbox").unset();
-    interact(".entry-grid").unset();
+    interact(".group-grid").unset();
     interact(".bubble-item").unset();
     interact(".bubble-size-handle").unset();
-    interact(".entry-grid-size-handle").unset();
+    interact(".group-grid-size-handle").unset();
     interact(".anchor-item").unset();
     interact(".anchor-rect").unset();
     interact(".anchor-size-handle").unset();
@@ -1271,7 +1279,7 @@ function setupInteractions() {
                 const fieldId = event.target.dataset.fieldId;
 
                 selectedFieldId = fieldId;
-                selectedEntryId = null;
+                selectedGroupId = null;
                 selectedAnchorId = null;
 
                 redrawAll();
@@ -1292,31 +1300,31 @@ function setupInteractions() {
         }
     });
 
-    interact(".entry-grid").draggable({
-        ignoreFrom: ".bubble-item, .bubble-size-handle, .entry-grid-size-handle",
+    interact(".group-grid").draggable({
+        ignoreFrom: ".bubble-item, .bubble-size-handle, .group-grid-size-handle",
 
         listeners: {
             start(event) {
-                const entryId = event.target.dataset.entryId;
+                const groupId = event.target.dataset.groupId;
 
-                selectEntry(entryId);
+                selectGroup(groupId);
             },
 
             move(event) {
-                const entryId = event.target.dataset.entryId;
-                const entry = getEntryById(entryId);
+                const groupId = event.target.dataset.groupId;
+                const group = getGroupById(groupId);
 
-                if (!entry) {
+                if (!group) {
                     return;
                 }
 
                 const delta = getSvgDeltaFromInteractEvent(event);
 
-                entry.start_x += delta.dx;
-                entry.start_y += delta.dy;
+                group.start_x += delta.dx;
+                group.start_y += delta.dy;
 
-                updateRenderedEntryPosition(entryId);
-                updateRenderedFieldHitbox(entry.id.split("|")[0]);
+                updateRenderedGroupPosition(groupId);
+                updateRenderedFieldHitbox(group.id.split("|")[0]);
                 scheduleRedrawConfig();
             },
 
@@ -1332,25 +1340,25 @@ function setupInteractions() {
 
         listeners: {
             start(event) {
-                const entryId = event.target.dataset.entryId;
+                const groupId = event.target.dataset.groupId;
 
-                selectEntry(entryId);
+                selectGroup(groupId);
             },
 
             move(event) {
-                const entryId = event.target.dataset.entryId;
+                const groupId = event.target.dataset.groupId;
                 const rowIdx = Number(event.target.dataset.rowIdx);
                 const colIdx = Number(event.target.dataset.colIdx);
-                const entry = getEntryById(entryId);
+                const group = getGroupById(groupId);
 
-                if (!entry) {
+                if (!group) {
                     return;
                 }
 
-                const defaultPosition = getBubbleDefaultPosition(entry, rowIdx, colIdx);
-                const currentPosition = getBubblePosition(entry, rowIdx, colIdx);
+                const defaultPosition = getBubbleDefaultPosition(group, rowIdx, colIdx);
+                const currentPosition = getBubblePosition(group, rowIdx, colIdx);
                 const override = getOrCreateOverride(
-                    entry,
+                    group,
                     rowIdx,
                     colIdx,
                     defaultPosition.x,
@@ -1362,7 +1370,7 @@ function setupInteractions() {
                 override.x = currentPosition.x + delta.dx;
                 override.y = currentPosition.y + delta.dy;
 
-                updateRenderedBubblePosition(entryId, rowIdx, colIdx, override.x, override.y);
+                updateRenderedBubblePosition(groupId, rowIdx, colIdx, override.x, override.y);
             },
 
             end() {
@@ -1376,9 +1384,9 @@ function setupInteractions() {
             start(event) {
                 document.body.classList.add("is-resizing");
 
-                const entryId = event.target.dataset.entryId;
+                const groupId = event.target.dataset.groupId;
 
-                selectEntry(entryId);
+                selectGroup(groupId);
             },
 
             move(event) {
@@ -1408,36 +1416,36 @@ function setupInteractions() {
         }
     });
 
-    interact(".entry-grid-size-handle").draggable({
+    interact(".group-grid-size-handle").draggable({
         listeners: {
             start(event) {
                 document.body.classList.add("is-resizing");
 
-                const entryId = event.target.dataset.entryId;
+                const groupId = event.target.dataset.groupId;
 
-                selectEntry(entryId);
+                selectGroup(groupId);
             },
 
             move(event) {
-                const entryId = event.target.dataset.entryId;
-                const field = getFieldByEntryId(entryId);
-                const entry = getEntryById(entryId);
+                const groupId = event.target.dataset.groupId;
+                const field = getFieldByGroupId(groupId);
+                const group = getGroupById(groupId);
 
-                if (!field || !entry) {
+                if (!field || !group) {
                     return;
                 }
 
                 const delta = getSvgDeltaFromInteractEvent(event);
 
-                const currentGridWidth = getGridWidth(field, entry);
-                const currentGridHeight = getGridHeight(field, entry);
+                const currentGridWidth = getGridWidth(field, group);
+                const currentGridHeight = getGridHeight(field, group);
 
                 const newGridWidth = Math.max(MIN_GRID_W, currentGridWidth + delta.dx);
                 const newGridHeight = Math.max(MIN_GRID_H, currentGridHeight + delta.dy);
 
-                applyEntrySpacingFromGridResize(field, entry, newGridWidth, newGridHeight);
-                updateEditorDefaultsFromEntry(entry);
-                updateRenderedEntryGrid(entryId);
+                applyGroupSpacingFromGridResize(field, group, newGridWidth, newGridHeight);
+                updateEditorDefaultsFromGroup(group);
+                updateRenderedGroupGrid(groupId);
                 scheduleRedrawConfig();
             },
 
@@ -1463,7 +1471,7 @@ function setupInteractions() {
 
                 selectedAnchorId = anchorNode.dataset.anchorId;
                 selectedFieldId = null;
-                selectedEntryId = null;
+                selectedGroupId = null;
 
                 redrawField();
                 redrawConfig();
@@ -1512,7 +1520,7 @@ function setupInteractions() {
 
                 selectedAnchorId = event.target.dataset.anchorId;
                 selectedFieldId = null;
-                selectedEntryId = null;
+                selectedGroupId = null;
 
                 redrawField();
                 redrawConfig();
@@ -1606,135 +1614,135 @@ bubbleHInput.addEventListener("input", () => {
     redrawCanvas();
 });
 
-entryNameInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+groupNameInput.addEventListener("input", () => {
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.name = entryNameInput.value;
+    group.name = groupNameInput.value;
 
     redrawField();
 });
 
-entryStartXInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+groupStartXInput.addEventListener("input", () => {
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.start_x = Number(entryStartXInput.value) || 0;
+    group.start_x = Number(groupStartXInput.value) || 0;
 
     redrawCanvas();
 });
 
-entryStartYInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+groupStartYInput.addEventListener("input", () => {
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.start_y = Number(entryStartYInput.value) || 0;
+    group.start_y = Number(groupStartYInput.value) || 0;
 
     redrawCanvas();
 });
 
 numQuestionsInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.num_questions = Math.max(1, Number(numQuestionsInput.value) || 1);
+    group.num_questions = Math.max(1, Number(numQuestionsInput.value) || 1);
 
-    entry.overrides = entry.overrides.filter((override) => {
-        return override.row_idx < entry.num_questions;
+    group.overrides = group.overrides.filter((override) => {
+        return override.row_idx < group.num_questions;
     });
 
-    updateEditorDefaultsFromEntry(entry);
+    updateEditorDefaultsFromGroup(group);
     redrawCanvas();
 });
 
 optionsInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
     const options = parseOptions(optionsInput.value);
 
-    entry.options = options.length > 0 ? options : ["A"];
+    group.options = options.length > 0 ? options : ["A"];
 
-    entry.overrides = entry.overrides.filter((override) => {
-        return override.col_idx < entry.options.length;
+    group.overrides = group.overrides.filter((override) => {
+        return override.col_idx < group.options.length;
     });
 
-    updateEditorDefaultsFromEntry(entry);
+    updateEditorDefaultsFromGroup(group);
     redrawCanvas();
 });
 
 rowSpacingInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.row_spacing = Math.max(1, Number(rowSpacingInput.value) || 1);
+    group.row_spacing = Math.max(1, Number(rowSpacingInput.value) || 1);
 
-    updateEditorDefaultsFromEntry(entry);
+    updateEditorDefaultsFromGroup(group);
     redrawCanvas();
 });
 
 colSpacingInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.col_spacing = Math.max(1, Number(colSpacingInput.value) || 1);
+    group.col_spacing = Math.max(1, Number(colSpacingInput.value) || 1);
 
-    updateEditorDefaultsFromEntry(entry);
+    updateEditorDefaultsFromGroup(group);
     redrawCanvas();
 });
 
 startQuestionNumInput.addEventListener("input", () => {
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.start_question_num = Math.max(1, Number(startQuestionNumInput.value) || 1);
+    group.start_question_num = Math.max(1, Number(startQuestionNumInput.value) || 1);
 });
 
 verticalOptionsInput.addEventListener("change", () => {
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.vertical_options = verticalOptionsInput.checked;
+    group.vertical_options = verticalOptionsInput.checked;
 
-    updateEditorDefaultsFromEntry(entry);
+    updateEditorDefaultsFromGroup(group);
     redrawCanvas();
 });
 
 clearOverridesButton.addEventListener("click", () => {
-    const entry = getSelectedEntry();
+    const group = getSelectedGroup();
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    entry.overrides = [];
+    group.overrides = [];
 
     redrawCanvas();
 });
@@ -1759,11 +1767,11 @@ overlayLayer.addEventListener("click", (event) => {
         return;
     }
 
-    const entryGrid = event.target.closest(".entry-grid");
+    const groupGrid = event.target.closest(".group-grid");
 
-    if (entryGrid) {
-        selectedFieldId = entryGrid.dataset.fieldId;
-        selectedEntryId = entryGrid.dataset.entryId;
+    if (groupGrid) {
+        selectedFieldId = groupGrid.dataset.fieldId;
+        selectedGroupId = groupGrid.dataset.groupId;
         selectedAnchorId = null;
 
         redrawAll();
@@ -1775,7 +1783,7 @@ overlayLayer.addEventListener("click", (event) => {
     if (anchorItem) {
         selectedAnchorId = anchorItem.dataset.anchorId;
         selectedFieldId = null;
-        selectedEntryId = null;
+        selectedGroupId = null;
 
         redrawAll();
         return;
@@ -1785,7 +1793,7 @@ overlayLayer.addEventListener("click", (event) => {
 
     if (fieldHitbox) {
         selectedFieldId = fieldHitbox.dataset.fieldId;
-        selectedEntryId = null;
+        selectedGroupId = null;
         selectedAnchorId = null;
 
         redrawAll();
@@ -1793,7 +1801,7 @@ overlayLayer.addEventListener("click", (event) => {
     }
 
     selectedFieldId = null;
-    selectedEntryId = null;
+    selectedGroupId = null;
     selectedAnchorId = null;
 
     redrawAll();
@@ -1810,7 +1818,7 @@ svg.addEventListener("click", (event) => {
     }
 
     selectedFieldId = null;
-    selectedEntryId = null;
+    selectedGroupId = null;
     selectedAnchorId = null;
 
     redrawAll();
@@ -1825,27 +1833,27 @@ fieldList.addEventListener("click", (event) => {
     }
 
     const targetId = item.dataset.id;
-    const isEntry = targetId.includes("|");
+    const isGroup = targetId.includes("|");
 
     selectedAnchorId = null;
 
-    if (isEntry) {
+    if (isGroup) {
         const parentFieldId = targetId.split("|")[0];
 
-        if (selectedEntryId === targetId) {
-            selectedEntryId = null;
+        if (selectedGroupId === targetId) {
+            selectedGroupId = null;
             selectedFieldId = parentFieldId;
         } else {
-            selectedEntryId = targetId;
+            selectedGroupId = targetId;
             selectedFieldId = parentFieldId;
         }
     } else {
-        if (selectedFieldId === targetId && selectedEntryId === null) {
+        if (selectedFieldId === targetId && selectedGroupId === null) {
             selectedFieldId = null;
-            selectedEntryId = null;
+            selectedGroupId = null;
         } else {
             selectedFieldId = targetId;
-            selectedEntryId = null;
+            selectedGroupId = null;
         }
     }
 
@@ -1859,13 +1867,13 @@ addFieldButton.addEventListener("click", () => {
     fields.push(field);
 
     selectedFieldId = field.id;
-    selectedEntryId = null;
+    selectedGroupId = null;
     selectedAnchorId = null;
 
     redrawAll();
 });
 
-addEntryButton.addEventListener("click", () => {
+addGroupButton.addEventListener("click", () => {
     if (!selectedFieldId) {
         return;
     }
@@ -1876,35 +1884,35 @@ addEntryButton.addEventListener("click", () => {
         return;
     }
 
-    const entry = newEntry(selectedFieldId);
+    const group = newGroup(selectedFieldId);
 
-    if (!entry) {
+    if (!group) {
         return;
     }
 
-    field.entries.push(entry);
+    field.groups.push(group);
 
-    selectedEntryId = entry.id;
+    selectedGroupId = group.id;
     selectedAnchorId = null;
 
     redrawAll();
 });
 
 duplicateButton.addEventListener("click", () => {
-    if (selectedEntryId) {
-        const field = getFieldByEntryId(selectedEntryId);
-        const entry = getEntryById(selectedEntryId);
+    if (selectedGroupId) {
+        const field = getFieldByGroupId(selectedGroupId);
+        const group = getGroupById(selectedGroupId);
 
-        if (!field || !entry) {
+        if (!field || !group) {
             return;
         }
 
-        const clonedEntry = cloneEntry(entry, field.id);
+        const clonedGroup = cloneGroup(group, field.id);
 
-        field.entries.push(clonedEntry);
+        field.groups.push(clonedGroup);
 
         selectedFieldId = field.id;
-        selectedEntryId = clonedEntry.id;
+        selectedGroupId = clonedGroup.id;
         selectedAnchorId = null;
 
         redrawAll();
@@ -1923,7 +1931,7 @@ duplicateButton.addEventListener("click", () => {
         fields.push(clonedField);
 
         selectedFieldId = clonedField.id;
-        selectedEntryId = null;
+        selectedGroupId = null;
         selectedAnchorId = null;
 
         redrawAll();
@@ -1940,17 +1948,17 @@ deleteButton.addEventListener("click", () => {
         return;
     }
 
-    if (selectedEntryId) {
-        const parentFieldId = selectedEntryId.split("|")[0];
+    if (selectedGroupId) {
+        const parentFieldId = selectedGroupId.split("|")[0];
         const field = getFieldById(parentFieldId);
 
         if (!field) {
             return;
         }
 
-        field.entries = field.entries.filter((entry) => entry.id !== selectedEntryId);
+        field.groups = field.groups.filter((group) => group.id !== selectedGroupId);
 
-        selectedEntryId = null;
+        selectedGroupId = null;
         selectedFieldId = parentFieldId;
 
         redrawAll();
@@ -1961,7 +1969,7 @@ deleteButton.addEventListener("click", () => {
         fields = fields.filter((field) => field.id !== selectedFieldId);
 
         selectedFieldId = null;
-        selectedEntryId = null;
+        selectedGroupId = null;
 
         redrawAll();
     }
@@ -1974,7 +1982,7 @@ addAnchorButton.addEventListener("click", () => {
 
     selectedAnchorId = anchor.id;
     selectedFieldId = null;
-    selectedEntryId = null;
+    selectedGroupId = null;
 
     redrawAll();
 });
@@ -2028,43 +2036,43 @@ importBlueprintInput.addEventListener("change", async (event) => {
             field.bubble_h = 20;
         }
 
-        field.entries.forEach((entry, index) => {
-            if (!entry.name) {
-                entry.name = `Entry ${index + 1}`;
+        field.groups.forEach((group, index) => {
+            if (!group.name) {
+                group.name = `Group ${index + 1}`;
             }
 
-            if (!entry.overrides) {
-                entry.overrides = [];
+            if (!group.overrides) {
+                group.overrides = [];
             }
 
-            if (!entry.options) {
-                entry.options = ["A", "B", "C", "D"];
+            if (!group.options) {
+                group.options = ["A", "B", "C", "D"];
             }
 
-            if (entry.start_question_num === undefined) {
-                entry.start_question_num = 1;
+            if (group.start_question_num === undefined) {
+                group.start_question_num = 1;
             }
 
-            if (entry.vertical_options === undefined) {
-                entry.vertical_options = false;
+            if (group.vertical_options === undefined) {
+                group.vertical_options = false;
             }
 
-            if (entry.num_questions === undefined) {
-                entry.num_questions = 4;
+            if (group.num_questions === undefined) {
+                group.num_questions = 4;
             }
 
-            if (entry.row_spacing === undefined) {
-                entry.row_spacing = 40;
+            if (group.row_spacing === undefined) {
+                group.row_spacing = 40;
             }
 
-            if (entry.col_spacing === undefined) {
-                entry.col_spacing = 40;
+            if (group.col_spacing === undefined) {
+                group.col_spacing = 40;
             }
         });
     });
 
     selectedFieldId = null;
-    selectedEntryId = null;
+    selectedGroupId = null;
     selectedAnchorId = null;
 
     redrawAll();
@@ -2126,18 +2134,18 @@ canvasWrap.addEventListener("wheel", (event) => {
 
 // Keyboard movement
 function moveSelectedBy(dx, dy) {
-    if (selectedEntryId) {
-        const entry = getEntryById(selectedEntryId);
+    if (selectedGroupId) {
+        const group = getGroupById(selectedGroupId);
 
-        if (!entry) {
+        if (!group) {
             return;
         }
 
-        entry.start_x += dx;
-        entry.start_y += dy;
+        group.start_x += dx;
+        group.start_y += dy;
 
-        updateRenderedEntryPosition(entry.id);
-        updateRenderedFieldHitbox(entry.id.split("|")[0]);
+        updateRenderedGroupPosition(group.id);
+        updateRenderedFieldHitbox(group.id.split("|")[0]);
         redrawConfig();
         return;
     }
@@ -2179,7 +2187,7 @@ window.addEventListener("keydown", (event) => {
         return;
     }
 
-    if (!selectedFieldId && !selectedEntryId && !selectedAnchorId) {
+    if (!selectedFieldId && !selectedGroupId && !selectedAnchorId) {
         return;
     }
 
@@ -2205,7 +2213,7 @@ window.addEventListener("keyup", (event) => {
         return;
     }
 
-    if (!selectedFieldId && !selectedEntryId && !selectedAnchorId) {
+    if (!selectedFieldId && !selectedGroupId && !selectedAnchorId) {
         return;
     }
 
@@ -2216,7 +2224,7 @@ window.addEventListener("keyup", (event) => {
 // Canvas panning
 canvasWrap.addEventListener("pointerdown", (event) => {
     const clickedInteractiveItem = event.target.closest(
-        ".field-hitbox, .entry-grid, .bubble-item, .bubble-size-handle, .entry-grid-size-handle, .anchor-item, .anchor-rect, .anchor-size-handle"
+        ".field-hitbox, .group-grid, .bubble-item, .bubble-size-handle, .group-grid-size-handle, .anchor-item, .anchor-rect, .anchor-size-handle"
     );
 
     if (clickedInteractiveItem) {
