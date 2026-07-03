@@ -700,7 +700,7 @@ function buildTemplateJson() {
                     height: Math.round(field.bubble_h)
                 },
                 groups: field.groups.map((group) => {
-                    const exportedGroups = [];
+                    const exportedEntries = [];
 
                     for (let rowIdx = 0; rowIdx < group.num_questions; rowIdx++) {
                         const question = group.start_question_num + rowIdx;
@@ -717,19 +717,14 @@ function buildTemplateJson() {
                         }
 
                         if (field.type == "identifier") {
-                            exportedGroups.push({
-                                bubbles: bubbles
-                            });
+                            exportedEntries.push({ bubbles: bubbles });
                         } else if (field.type == "answers") {
-                            exportedGroups.push({
-                                question: question,
-                                bubbles: bubbles
-                            });
+                            exportedEntries.push({ question: question, bubbles: bubbles });
                         }
                     }
 
                     return {
-                        groups: exportedGroups
+                        entries: exportedEntries   // <- was "groups", should be "entries"
                     };
                 })
             };
